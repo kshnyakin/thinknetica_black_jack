@@ -28,7 +28,7 @@ class CardDeck
         result_cards << {
           view: "#{card_types[index]}-#{suit}",
           value: card_values[index],
-          slug: "#{card_suits_slugs[suit_index]}-#{card_slugs[index]}"
+          slug: "#{card_slugs[index]}-#{card_suits_slugs[suit_index]}"
         }
       end
     end
