@@ -1,11 +1,14 @@
-require 'pry'
+# frozen_string_literal: true
+
 require_relative 'gamer'
 require_relative 'dealer'
 require_relative 'card_deck'
 
+# Main Game class
+# rubocop:disable Metrics/ClassLength
 class Game
-
   attr_reader :gamer, :dealer, :card_deck, :bank
+
   BET_SIZE = 10
 
   def initialize
@@ -23,16 +26,17 @@ class Game
   end
 
   def take_name_and_initialize
-    puts "Добро пожаловать в игру Black Jack (Thinknetica edition)"
-    unless self.gamer.name
-      print "Для начала игры введите ваше имя: "
-      user_name = gets.chomp
-      self.gamer.name = user_name
-    end
-    puts "\n\tСпасибо, #{self.gamer.name}, для вас начинается игра Black Jack!"
-    puts "Ваши карты = #{cards_view_output(self.gamer)}, "\
-         "сумма очков: #{self.gamer.calculate_card_points}"
-    puts "Карты дилера = #{dealer_sanitized_cards}"
+    puts "\nДобро пожаловать в игру Black Jack (Thinknetica edition)"
+    gamer_name_initialzer
+    puts "\n\tСпасибо, #{gamer.name}, для вас начинается игра Black Jack!"
+  end
+
+  def gamer_name_initialzer
+    return if gamer.name
+
+    print 'Для начала игры введите ваше имя: '
+    user_name = gets.chomp
+    gamer.name = user_name
   end
 
   def cards_view_output(user)
@@ -45,12 +49,8 @@ class Game
 
   def gamer_turn
     return finishing_game if game_over?
-    puts "\nВаш ход, #{self.gamer.name}, для вас доступны варианты:"
-    puts "\t1 - Пропустить ход"
-    puts "\t2 - Добавить карту"
-    puts "\t3 - Открыть карты и подсчитать результаты"
-    print "Введите цифру с вашим выбором: "
-    gamer_select = gets.chomp
+
+    gamer_select = prepare_input
     case gamer_select
     when '1'
       skip_gamer_turn
@@ -61,118 +61,160 @@ class Game
     end
   end
 
+  def prepare_input
+    puts "\nВаш ход, #{gamer.name}, для вас доступны варианты:"
+    show_score_table
+    puts "\t1 - Пропустить ход"
+    puts "\t2 - Добавить карту"
+    puts "\t3 - Открыть карты и подсчитать результаты"
+    print 'Введите цифру с вашим выбором: '
+    gets.chomp
+  end
+
+  def show_score_table
+    puts "Ваши карты = #{cards_view_output(gamer)}, "\
+      "сумма очков: #{gamer_points}"
+    puts "Карты дилера = #{dealer_sanitized_cards}"
+  end
+
   def skip_gamer_turn
-    puts 'Вы пропустили ход. Ожидаем действия дилера'
-    dealer_auto_turn
+    if dealer_points < 17
+      puts 'Вы пропустили ход. Ожидаем действий дилера'
+      dealer_auto_turn
+    else
+      puts 'Дилер также пропустил ход, вам необходимо либо добавить карту, '\
+        'либо открыть карты и подсчитать результаты'
+      gamer_turn
+    end
   end
 
   def dealer_auto_turn
     return finishing_game if game_over?
-    points = self.dealer.calculate_card_points
-    if points >= 17
-      gamer_turn
-    else
-      take_one_card(self.dealer)
-      gamer_turn
-    end
+
+    take_one_card(dealer) if dealer_points < 17 && dealer.cards.size <= 3
+    gamer_turn
   end
 
   def add_card_to_gamer
-    card = take_one_card(self.gamer)
-    puts "Вам досталась карта #{self.gamer.cards.last[:view]}"
-    puts "Ваши карты = #{cards_view_output(self.gamer)}, "\
-      "сумма очков: #{self.gamer.calculate_card_points}"
+    take_one_card(gamer)
+    puts "Вам досталась карта #{gamer.cards.last[:view]}"
+    puts "Ваши карты = #{cards_view_output(gamer)}, "\
+      "сумма очков: #{gamer_points}"
     puts "Карты дилера = #{dealer_sanitized_cards}"
     return finishing_game if game_over?
+
     dealer_auto_turn
   end
 
   def open_cards
-    puts "Открываем карты, заканчиваем игру"
+    puts 'Открываем карты, заканчиваем игру'
     finishing_game
   end
 
   def game_over?
-    self.gamer.cards.size == 3 && 
-    (self.dealer.cards.size == 3 || self.dealer.calculate_card_points >= 17)
+    gamer.cards.size == 3 &&
+      (dealer.cards.size == 3 || dealer_points >= 17)
   end
 
   def finishing_game
     puts "\nИгра окончена, подсчет очков"
-    puts "Игрок '#{self.gamer.name}', количество очков: #{self.gamer.calculate_card_points}, "\
-      "карты = #{cards_view_output(self.gamer)}"
-    puts "Дилер, количество очков: #{self.dealer.calculate_card_points}, "\
-      "карты = #{cards_view_output(self.dealer)}"
-    puts "\nПодведение итогов игры (handling_winner method)"
-    puts "the winner is #{handling_winner}"
+    output_gamers_final_values
+    puts "\nПодведение итогов игры"
     bank_distribution(handling_winner)
+    output_final_game_status(handling_winner)
     output_account_amounts
     new_game_invite
   end
 
+  def output_gamers_final_values
+    puts "Игрок '#{gamer.name}', количество очков: #{gamer_points}, "\
+      "карты = #{cards_view_output(gamer)}"
+    puts "Дилер, количество очков: #{dealer_points}, "\
+      "карты = #{cards_view_output(dealer)}"
+  end
+
   def handling_winner
-    dealer_points = self.dealer.calculate_card_points
-    gamer_points = self.gamer.calculate_card_points
-    return 'standoff' if (dealer_points == gamer_points) && (dealer_points <= 21)
-    return 'dealer' if dealer_points <= 21 && gamer_points > 21
-    return 'gamer' if gamer_points <= 21 && dealer_points > 21
-    dealer_points > gamer_points ? 'dealer' : 'gamer'
+    final_dealer_points = dealer_points
+    final_gamer_points = gamer_points
+    return 'standoff' if final_dealer_points == final_gamer_points
+    return 'dealer' if final_dealer_points <= 21 && final_gamer_points > 21
+    return 'gamer' if final_gamer_points <= 21 && final_dealer_points > 21
+
+    final_dealer_points > final_gamer_points ? 'dealer' : 'gamer'
   end
 
   def bank_distribution(result)
-    bank_value = @bank
-    @bank = 0
     case result
     when 'dealer'
-      self.dealer.increase_account(bank_value)
+      dealer.increase_account(@bank)
     when 'gamer'
-      self.gamer.increase_account(bank_value)
+      gamer.increase_account(@bank)
     when 'standoff'
-      self.dealer.increase_account(bank_value / 2)
-      self.gamer.increase_account(bank_value / 2)
+      dealer.increase_account(@bank / 2)
+      gamer.increase_account(@bank / 2)
     end
+    @bank = 0
   end
 
   def output_account_amounts
-    dealer_amount = self.dealer.account_amount
-    gamer_amount = self.gamer.account_amount
+    dealer_amount = dealer.account_amount
+    gamer_amount = gamer.account_amount
+    puts "\nБанковские счета игроков:"
     puts "\tСчет игрока = #{gamer_amount}"
     puts "\tСчет дилера = #{dealer_amount}"
   end
 
+  def output_final_game_status(winner)
+    case winner
+    when 'dealer'
+      puts 'Игра окончилась победой дилера.'
+    when 'gamer'
+      puts 'Игра окончилась победой игрока.'
+    when 'standoff'
+      puts 'Игра окончилась в ничью.'
+    end
+  end
+
   def new_game_invite
     puts "\nЖелаете сыграть еще партию?"
-    puts "1 - да"
-    puts "2 - нет"
-    print ('Введите ваш ответ: ')
+    puts '1 - да'
+    puts '2 - нет'
+    print('Введите ваш ответ: ')
     user_choice = gets.chomp
+    user_choice_hanling(user_choice)
+  end
+
+  def user_choice_hanling(user_choice)
     case user_choice
     when '1'
-      if self.gamer.account_amount < 10
-        puts "Извините, у вас больше нет денег для игры, зарабатывайте и приходите играть снова!"
-      else
-        puts "Ожидайте, новая игра подготавливается"
-        sleep 2
-        create_new_game
-      end
+      start_new_game
     when '2'
-      puts "Благодарим за игру, будем рады видеть вас снова!"
+      puts 'Благодарим за игру, будем рады видеть вас снова!'
+    end
+  end
+
+  def start_new_game
+    if gamer.account_amount < 10
+      puts 'Извините, у вас больше нет денег для игры, зарабатывайте и приходите играть снова!'
+    else
+      puts 'Ожидайте, новая игра подготавливается'
+      sleep 0.75
+      create_new_game
     end
   end
 
   def create_new_game
     @card_deck = CardDeck.new
-    self.dealer.clear_cards
-    self.gamer.clear_cards
+    dealer.clear_cards
+    gamer.clear_cards
     deal_cards
     make_first_bets
     start
   end
 
-
   def dealer_sanitized_cards
     cards = []
-    self.dealer.cards.size.times{ cards << "*"}
+    dealer.cards.size.times { cards << '*' }
     cards.join(',')
   end
 
@@ -182,6 +224,14 @@ class Game
 
   private
 
+  def dealer_points
+    dealer.calculate_card_points
+  end
+
+  def gamer_points
+    gamer.calculate_card_points
+  end
+
   def deal_cards
     2.times do
       gamer.take_card(card_deck.take_random_card)
@@ -190,17 +240,11 @@ class Game
   end
 
   def make_first_bets
-    # без @ переменная экземпляра bank почему-то определяется как nil,
-    # хотя в initialize она определена как 0
     @bank += BET_SIZE if dealer.make_bet(BET_SIZE)
     @bank += BET_SIZE if gamer.make_bet(BET_SIZE)
   end
-
-  def show_menu
-  end
-
 end
+# rubocop:enable Metrics/ClassLength
 
 game = Game.new
 game.start
-
