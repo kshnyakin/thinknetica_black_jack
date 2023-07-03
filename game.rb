@@ -25,6 +25,8 @@ class Game
     gamer_turn
   end
 
+  private
+
   def take_name_and_initialize
     puts "\nДобро пожаловать в игру Black Jack (Thinknetica edition)"
     gamer_name_initialzer
@@ -221,8 +223,6 @@ class Game
   def take_one_card(player)
     player.take_card(card_deck.take_random_card)
   end
-
-  private
 
   def dealer_points
     dealer.calculate_card_points

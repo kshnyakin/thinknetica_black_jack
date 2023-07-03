@@ -49,6 +49,8 @@ class User
     max_value
   end
 
+  private
+  
   def ace_values(quantity)
     case quantity
     when 1
